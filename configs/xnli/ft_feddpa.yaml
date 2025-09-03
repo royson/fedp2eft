@@ -1,0 +1,14 @@
+models:
+  net:
+    class: src.models.get_seq_class_feddpa_peft_llm_model
+    args: 
+      local_adapter_path: /scratch-01/fedp2eft_public/models/xnli_feddpa_mbert/{cid}.pt
+      local_lora_args:
+        r: 8
+        lora_alpha: 8
+        lora_dropout: 0.05
+        bias: none
+app:
+  client:
+    args:
+      load_local_layers: True

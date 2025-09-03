@@ -1,0 +1,76 @@
+data:
+  class: src.data.FedAyaDataset
+  args:
+    pre_partition: True
+    test_ratio: 0.2
+    val_ratio: 0.0
+    pool: seen
+models:
+  net:
+    class: src.models.get_causal_peft_llm_model
+    args:
+      model_name_or_path: mtgv/MobileLLaMA-1.4B-Base
+      adapter: lora
+      adapter_args:
+        r: 16
+        lora_alpha: 32
+        lora_dropout: 0.05
+        bias: none
+        task_type: CAUSAL_LM
+      gradient_checkpointing: False
+      quantization: null
+      attn_implementation: sdpa
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: mtgv/MobileLLaMA-1.4B-Base
+      padding_side: right
+      seq_length: 1024
+  prompt:
+    formatting_prompt_func: 
+      class: src.apps.clients.get_alpaca_formatting_prompts_func
+    prompt_template: 
+      class: src.apps.clients.alpaca_template
+app:
+  class: src.apps.SFTApp
+  args: 
+    skip_initial_eval: True
+  on_fit:
+    mode: cosine
+    lr: 0.00002
+  on_evaluate:
+    lr: 0.00001
+  evaluate_fn:
+    batch_size: 8
+    # eval_accumulation_steps: 1
+    generate_args:
+      do_sample: False
+      # top_p: 1.0
+      # temperature: 0.7
+      # prompt_lookup_num_tokens: 3
+      max_new_tokens: 1024
+      cache_implementation: static
+  run:
+    num_rounds: 200
+    test_every_n: 200 # global_eval_every_n_rounds
+    save_every_n: 200
+  client:
+    class: src.apps.clients.SFTClient
+    args: 
+      num_train_epochs: 0
+      max_steps : 10
+      batch_size : 4
+      gradient_accumulation_steps: 4
+server:
+  class: src.server.LLMServer
+  client_manager:
+    class: src.server.client_managers.SimpleClientManager
+  strategy:
+    class: src.server.strategies.MultilingualFedAvg
+    args:
+      min_fit_clients: 3 # clients_per_round
+      log: False
+    valuation: null
+simulation:
+  num_clients: 38
+vram: 44000

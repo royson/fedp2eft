@@ -1,0 +1,15 @@
+wandb_args:
+  entity: myentity
+  project: 'fedp2eft'
+  dir: '.'
+vram : 2500 # MB
+cpus : 2
+debug: false
+run: true
+model_directory: /scratch-01/fedp2eft_public/models
+seed: 42
+cpu_threads: 10
+simulation:
+  ray_init_args:
+    include_dashboard: False
+    ignore_reinit_error: True

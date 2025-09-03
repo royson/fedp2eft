@@ -1,0 +1,81 @@
+data:
+  class: src.data.XNLIDataset
+  args:
+    pre_partition: True
+    val_ratio: 0.0
+    pool: seen
+models:
+  net:
+    class: src.models.get_seq_class_peft_llm_model
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      adapter: adalora
+      adapter_args:
+        init_r: 24
+        target_r: 16
+        deltaT: 1
+        orth_reg_weight: 0.1
+        lora_dropout: 0.0
+        bias: none
+        target_modules: all-linear
+      config_args:
+        label_list: 
+          - 'entailment'
+          - 'neutral'
+          - 'contradiction'
+        finetuning_task: xnli
+      gradient_checkpointing: False
+      quantization: null
+      attn_implementation: sdpa
+    preprocess_model:
+      class: src.models.model_utils.set_adalora_steps
+      args:
+        tinit_percentage: 0.1
+        tfinal_percentage: 0.3
+    trainer_callback:
+      class: src.models.model_utils.AdaLoRA_Callback
+      args: {}
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      padding_side: right
+      seq_length: 512
+  prompt:
+    formatting_prompt_func: 
+      class: src.data.xnli_dataset.preprocess_function
+      args:
+        max_length: 128
+        padding: max_length
+  metric:
+    class: src.data.xnli_dataset.get_compute_metrics
+    args: {}
+app:
+  class: src.apps.SeqClsApp
+  args: 
+    test_only: True
+  on_evaluate:
+    lr: 0.001
+  client:
+    class: src.apps.clients.SeqClsClient
+    args: 
+      num_train_epochs: 2
+      max_steps : -1
+      batch_size : 32
+      gradient_accumulation_steps: 1
+      label_names:
+        - labels
+server:
+  class: src.server.LLMServer
+  client_manager:
+    class: src.server.client_managers.SimpleClientManager
+  strategy:
+    class: src.server.strategies.MultilingualFedAvg
+    args:
+      task: classification
+      min_fit_clients: 30 # clients_per_round
+      log: False
+    valuation: null
+simulation:
+  num_clients: 600
+vram: 44000

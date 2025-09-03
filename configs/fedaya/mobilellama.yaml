@@ -1,0 +1,13 @@
+models:
+  net:
+    class: src.models.get_causal_peft_llm_model
+    args:
+      model_name_or_path: mtgv/MobileLLaMA-1.4B-Base
+      quantization: null
+      adapter_args:
+        target_modules: all-linear
+
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: mtgv/MobileLLaMA-1.4B-Base

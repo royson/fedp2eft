@@ -1,0 +1,83 @@
+data:
+  class: src.data.XNLIDataset
+  args:
+    pre_partition: True
+    val_ratio: 0.0
+    pool: seen
+models:
+  net:
+    class: src.models.get_seq_class_peft_llm_model
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      adapter: lora
+      adapter_args:
+        r: 8
+        lora_alpha: 8
+        lora_dropout: 0.05
+        bias: none
+        task_type: SEQ_CLS
+      config_args:
+        label_list: 
+          - 'entailment'
+          - 'neutral'
+          - 'contradiction'
+        finetuning_task: xnli
+      gradient_checkpointing: False
+      quantization: null
+      attn_implementation: sdpa
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      padding_side: right
+      seq_length: 512
+  prompt:
+    formatting_prompt_func: 
+      class: src.data.xnli_dataset.preprocess_function
+      args:
+        max_length: 128
+        padding: max_length
+  metric:
+    class: src.data.xnli_dataset.get_compute_metrics
+    args: {}
+app:
+  class: src.apps.SeqClsApp
+  args: 
+    skip_initial_eval: True
+  on_fit:
+    mode: constant
+    lr: 0.00005
+  on_evaluate:
+    lr: 0.00005
+  run:
+    num_rounds: 100
+    test_every_n: 100 # global_eval_every_n_rounds
+    save_every_n: 100
+  client:
+    class: src.apps.clients.FedDPASeqClsClient
+    args: 
+      num_train_epochs: 2
+      max_steps : -1
+      batch_size : 32
+      gradient_accumulation_steps: 1
+      label_names:
+        - labels
+      local_lora_args:
+        r: 8
+        lora_alpha: 8
+        lora_dropout: 0.05
+        bias: none
+server:
+  class: src.server.LLMServer
+  client_manager:
+    class: src.server.client_managers.SimpleClientManager
+  strategy:
+    class: src.server.strategies.MultilingualFedAvg
+    args:
+      task: classification
+      min_fit_clients: 30 # clients_per_round
+      log: False
+    valuation: null
+simulation:
+  num_clients: 600
+vram: 44000

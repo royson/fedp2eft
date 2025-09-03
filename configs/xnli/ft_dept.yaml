@@ -1,0 +1,11 @@
+models:
+  net:
+    class: src.models.get_seq_class_dept_peft_llm_model
+    args: 
+      local_embeds_path: /scratch-01/fedp2eft_public/models/xnli_dept_mbert/{cid}_embeds.pt
+      global_body_path: /scratch-01/fedp2eft_public/models/xnli_dept_mbert/weights_round_100.pkl
+app:
+  client:
+    args:
+      load_local_layers: True
+      load_local_tokenizer: False

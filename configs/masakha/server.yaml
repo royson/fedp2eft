@@ -1,0 +1,13 @@
+data:
+  args:
+    path_to_data: /scratch-01/fedp2eft_public
+    dataset_fl_root: /scratch-01/fedp2eft_public/FL
+models:
+  net:
+    args:
+      cache_dir: /scratch-01/fedp2eft_public/pretrained_models
+  tokenizer:
+    args:
+      cache_dir: /scratch-01/fedp2eft_public/pretrained_models
+model_directory: /scratch-01/fedp2eft_public/models
+vram: 46000

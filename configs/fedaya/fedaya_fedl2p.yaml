@@ -1,0 +1,93 @@
+data:
+  class: src.data.FedAyaDataset
+  args:
+    pre_partition: True
+    test_ratio: 0.2
+    val_ratio: 0.2
+    pool: seen
+models:
+  net:
+    class: src.models.get_causal_peft_llm_model
+    args:
+      model_name_or_path: mtgv/MobileLLaMA-1.4B-Base
+      adapter: lora
+      adapter_args:
+        r: 16
+        lora_alpha: 32
+        lora_dropout: 0.0
+        bias: none
+        target_modules: all-linear
+        task_type: CAUSAL_LM
+      gradient_checkpointing: False
+      quantization: null
+      attn_implementation: eager
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: mtgv/MobileLLaMA-1.4B-Base
+      padding_side: right
+      seq_length: 1024
+  prompt:
+    formatting_prompt_func: 
+      class: src.apps.clients.get_alpaca_formatting_prompts_func
+    prompt_template: 
+      class: src.apps.clients.alpaca_template
+app:
+  class: src.apps.FedL2PSFTApp
+  args:
+    test_only: False
+    load_fedl2p_params: null # if null, trains FedL2P parameters from scratch
+    patience: 50 # early stopping patience
+  evaluate_fn:
+    batch_size: 8
+    generate_args:
+      do_sample: False
+      max_new_tokens: 1024
+      cache_implementation: static
+  run:
+    num_rounds: 200
+    test_every_n: null # if None, uses early stopping
+    save_every_n: null
+  client:
+    class: src.apps.clients.FedL2PSFTClient
+    args: 
+      inner_loop_lr: 0.0001
+      learnable_inner_loop_lr: True
+      outer_loop_steps: 3
+      outer_loop_grad_accum: 16
+      hypergrad:
+        class: src.apps.clients.client_utils.Hypergrad
+        args:
+          learning_rate: 0.1
+          truncate_iter: 3
+      meta_optimizers:
+        inner_loop_lrs:
+          class: torch.optim.Adam
+          args:
+            lr: 0.000001
+        lr_net:
+          class: torch.optim.Adam
+          args:
+            lr: 0.0001
+      task_optimizer:
+        class: src.apps.clients.client_utils.FedL2PAdamW
+        args:
+          betas: !!python/tuple [0.9, 0.999]
+          weight_decay: 0
+      num_train_epochs: 2
+      max_steps : -1 
+      batch_size : 4
+      gradient_accumulation_steps: 4
+server:
+  class: src.server.LLMServer
+  client_manager:
+    class: src.server.client_managers.SimpleClientManager
+  strategy:
+    class: src.server.strategies.MultilingualFedAvg
+    args:
+      min_fit_clients: 3 # clients_per_round
+      log: False
+    valuation: null
+simulation:
+  num_clients: 38 
+vram: 44000

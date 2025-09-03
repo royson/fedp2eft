@@ -1,0 +1,18 @@
+models:
+  net:
+    class: src.models.get_causal_peft_llm_model
+    args:
+      model_name_or_path: meta-llama/Llama-3.2-3B-Instruct
+      quantization: null
+      adapter_args:
+        target_modules: all-linear
+        modules_to_save: null
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: meta-llama/Llama-3.2-3B-Instruct
+  prompt:
+    formatting_prompt_func: 
+      class: src.apps.clients.get_llama3_instruct_formatting_prompts_func
+    prompt_template: 
+      class: src.apps.clients.llama3_instruct_template

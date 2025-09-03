@@ -1,0 +1,98 @@
+data:
+  class: src.data.XNLIDataset
+  args:
+    pre_partition: True
+    val_ratio: 0.2
+    pool: seen
+models:
+  net:
+    class: src.models.get_seq_class_peft_llm_model
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      adapter: lora
+      adapter_args:
+        r: 16
+        lora_alpha: 32
+        lora_dropout: 0.0
+        bias: none
+        target_modules: all-linear
+      config_args:
+        label_list: 
+          - 'entailment'
+          - 'neutral'
+          - 'contradiction'
+        finetuning_task: xnli
+      gradient_checkpointing: False
+      quantization: null
+      attn_implementation: eager
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      padding_side: right
+      seq_length: 512
+  prompt:
+    formatting_prompt_func: 
+      class: src.data.xnli_dataset.preprocess_function
+      args:
+        max_length: 128
+        padding: max_length
+  metric:
+    class: src.data.xnli_dataset.get_compute_metrics
+    args: {}
+app:
+  class: src.apps.FedL2PSeqClsApp
+  args:
+    test_only: False
+    load_fedl2p_params: null # if null, trains FedL2P parameters from scratch
+    patience: 50 # early stopping patience
+  run:
+    num_rounds: 200
+    test_every_n: null # if None, uses early stopping
+    save_every_n: null
+  client:
+    class: src.apps.clients.FedL2PSeqClsClient
+    args: 
+      inner_loop_lr: 0.0001
+      learnable_inner_loop_lr: True
+      outer_loop_steps: 3
+      outer_loop_grad_accum: 16
+      hypergrad:
+        class: src.apps.clients.client_utils.Hypergrad
+        args:
+          learning_rate: 0.1
+          truncate_iter: 3
+      meta_optimizers:
+        inner_loop_lrs:
+          class: torch.optim.Adam
+          args:
+            lr: 0.000001
+        lr_net:
+          class: torch.optim.Adam
+          args:
+            lr: 0.0001
+      task_optimizer:
+        class: src.apps.clients.client_utils.FedL2PAdamW
+        args:
+          betas: !!python/tuple [0.9, 0.999]
+          weight_decay: 0
+      num_train_epochs: 2
+      max_steps : -1 
+      batch_size : 32
+      gradient_accumulation_steps: 1
+      label_names:
+        - labels
+server:
+  class: src.server.LLMServer
+  client_manager:
+    class: src.server.client_managers.SimpleClientManager
+  strategy:
+    class: src.server.strategies.MultilingualFedAvg
+    args:
+      task: classification
+      min_fit_clients: 30 # clients_per_round
+      log: False
+    valuation: null
+simulation:
+  num_clients: 600
+vram: 44000

@@ -1,0 +1,96 @@
+data:
+  class: src.data.XNLIDataset
+  args:
+    pre_partition: True
+    val_ratio: 0.0
+    pool: seen
+models:
+  net:
+    class: src.models.get_seq_class_peft_llm_model
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      adapter: lora
+      adapter_args:
+        r: 16
+        lora_alpha: 32
+        lora_dropout: 0.0
+        bias: none
+        target_modules: all-linear
+      config_args:
+        label_list: 
+          - 'entailment'
+          - 'neutral'
+          - 'contradiction'
+        finetuning_task: xnli
+      gradient_checkpointing: False
+      quantization: null
+      attn_implementation: sdpa
+      bt: True
+  tokenizer:
+    class: src.models.get_llm_tokenizer
+    args:
+      model_name_or_path: google-bert/bert-base-multilingual-cased
+      padding_side: right
+      seq_length: 512
+  prompt:
+    formatting_prompt_func: 
+      class: src.data.xnli_dataset.preprocess_function
+      args:
+        max_length: 128
+        padding: max_length
+  metric:
+    class: src.data.xnli_dataset.get_compute_metrics
+    args: {}
+app:
+  class: src.apps.FedL2PSeqClsApp
+  args:
+    test_only: False
+    load_fedl2p_params: null # TODO: change
+    patience: null # early stopping patience
+  run:
+    num_rounds: 150
+    test_every_n: 50 # if None, uses early stopping
+    save_every_n: 50
+  client:
+    class: src.apps.clients.FedP2EFTSeqClsClient
+    args: 
+      btmode: rankwise
+      bt_steps: 10
+      btnet_optimizer:
+        class: torch.optim.Adam
+        args:
+          lr: 0.0001
+      loss_weights:
+        sparsity: 0.01
+        significance: 100.0
+        task: 1.0
+      eval_rank: null
+      eval_rank_only: False # ignore values. pick top-k rank and set em to 1.
+      eval_train_bts: False
+      sample_bts: False
+      sample_bts_warmup: 20
+      include_quantity: False
+      bt_hl_mul: 2 # btnet hidden layer size = bt_hl_mul * input size
+      task_lr: 0.0001
+      bts_lr: 0.01
+      bts_max_clamp: 1000.
+      num_train_epochs: 2
+      max_steps : -1 
+      batch_size : 32
+      gradient_accumulation_steps: 1
+      label_names:
+        - labels
+server:
+  class: src.server.LLMServer
+  client_manager:
+    class: src.server.client_managers.SimpleClientManager
+  strategy:
+    class: src.server.strategies.MultilingualFedAvg
+    args:
+      task: classification
+      min_fit_clients: 30 # clients_per_round
+      log: False
+    valuation: null
+simulation:
+  num_clients: 600
+vram: 44000
