@@ -1,5 +1,7 @@
 # [FedP²EFT: Federated Learning to Personalize PEFT for Multilingual LLMs](https://arxiv.org/abs/2502.04387)
 
+#### Update (7 Nov 2026): FedP²EFT is accepted @ AAAI-26.
+
 ## Environment
 
 ```
